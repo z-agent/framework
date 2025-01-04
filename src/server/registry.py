@@ -1,19 +1,9 @@
-from typing import Type
 from crewai.tools import BaseTool
-from dataclasses import dataclass
-
-
-@dataclass
-class RemoteTool:
-    class_tool_id: str
-
-    tool_id: str
-    description: str
-    model_dict: dict
+from ..common.types import RemoteTool
 
 
 class ToolRegistry:
-    self.tools = {}
+    tools = {}
 
     def register_tool(tool_id: str, tool: BaseTool):
         if tool_id in self.tools:
@@ -29,8 +19,8 @@ class ToolRegistry:
             ),
         )
 
-    def get_tool(tool_id: str):
-        return TOOLS[tool_id][1]
+    def get_tool(self, tool_id: str):
+        return self.tools[tool_id][1]
 
-    def execute_tool(tool_id, kwargs: dict):
-        return TOOLS[tool_id][0].run(**kwargs)
+    def execute_tool(self, tool_id, kwargs: dict):
+        return self.tools[tool_id][0].run(**kwargs)

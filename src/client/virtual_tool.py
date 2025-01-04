@@ -1,9 +1,9 @@
-import json
 from typing import Type
-from . import registry
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field, create_model
+
+from ..common.types import RemoteTool
 
 
 # Convert a Pydantic model dump JSON to a Model object
@@ -27,10 +27,7 @@ def create_model_from_json_schema(schema_name, schema_json) -> Type[BaseModel]:
 
 
 # Create a virtual tool to proxy all calls to the hosted tool
-def get_virtual_tool(remote_tool: registry.RemoteTool | str):
-    if isinstance(remote_tool, str):
-        remote_tool = registry.get_tool(remote_tool)
-
+def create_virtual_tool(remote_tool: RemoteTool, execute):
     class VirtualTool(BaseTool):
         __qualname__ = remote_tool.class_name
         __name__ = remote_tool.class_name
@@ -42,6 +39,6 @@ def get_virtual_tool(remote_tool: registry.RemoteTool | str):
         )
 
         def _run(self, **kwargs):
-            return registry.execute_tool(remote_tool.class_name, kwargs)
+            return execute(remote_tool, kwargs)
 
     return VirtualTool()
