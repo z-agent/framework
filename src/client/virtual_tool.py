@@ -39,6 +39,7 @@ def create_virtual_tool(remote_tool: RemoteTool, execute):
         )
 
         def _run(self, **kwargs):
+            print("EXECUTING TOOL", remote_tool.name)
             return execute(remote_tool, kwargs)
 
     return VirtualTool()

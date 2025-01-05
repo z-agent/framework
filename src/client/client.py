@@ -1,7 +1,9 @@
 from websockets.sync.client import connect
 import json
+from .virtual_tool import create_virtual_tool
 from ..common.types import (
     AgentMetadataRequest,
+    AgentExecuteRequest,
     REQUEST_RESPONSE_TYPE_MAP,
     MessageType,
 )
@@ -44,6 +46,7 @@ def create_virtual_tools(websocket, tools: list[str]):
                 ).response,
             )
         )
+    return virtual_tools
 
 
 def generate_crew(websocket):
@@ -60,14 +63,17 @@ def generate_crew(websocket):
     agents_config = read_yaml("config/agents.yaml")
     tasks_config = read_yaml("config/tasks.yaml")
 
-    for agent_name, config in agents_config.values():
+    for agent_name in agents_config:
 
         @agent
         def fn(self) -> Agent:
             return Agent(
                 config=self.agents_config[agent_name],
                 verbose=True,
-                tools=create_virtual_tools(config.get("tools", [])),
+                tools=create_virtual_tools(
+                    websocket,
+                    self.agents_config[agent_name].get("agent_tools", []),
+                ),
             )
 
         setattr(GeneratedCrew, agent_name, fn)

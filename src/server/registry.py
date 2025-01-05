@@ -5,7 +5,7 @@ from ..common.types import RemoteTool
 class ToolRegistry:
     tools = {}
 
-    def register_tool(tool_id: str, tool: BaseTool):
+    def register_tool(self, tool_id: str, tool: BaseTool):
         if tool_id in self.tools:
             raise ValueError(f"{tool_id} already in tools")
 
@@ -13,7 +13,7 @@ class ToolRegistry:
             tool,
             RemoteTool(
                 class_tool_id=tool_id,
-                tool_id=tool.tool_id,
+                tool_id=tool_id,
                 description=tool.description,
                 model_dict=tool.args_schema.model_json_schema(),
             ),
