@@ -3,6 +3,8 @@ from websockets.server import serve
 from dataclasses import asdict
 import json
 import crewai_tools
+from qdrant_client import QdrantClient
+from qdrant_client.models import VectorParams, Distance
 
 from .registry import ToolRegistry
 
@@ -49,7 +51,9 @@ class AgentRegistry:
 
 
 async def main():
-    registry = ToolRegistry()
+    client = QdrantClient(host="localhost", port=6333)
+
+    registry = ToolRegistry(client)
     registry.register_tool("SerperDevTool", crewai_tools.SerperDevTool())
 
     async with serve(AgentRegistry(registry).server, "localhost", 8000):
