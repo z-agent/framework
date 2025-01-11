@@ -1,10 +1,10 @@
 import asyncio
-from websockets.server import serve
 from dataclasses import asdict
 import json
 import crewai_tools
 from qdrant_client import QdrantClient
 from qdrant_client.models import VectorParams, Distance
+import uvicorn
 
 from .registry import ToolRegistry
 
@@ -40,14 +40,12 @@ class AgentRegistry:
             )
         )
 
-    async def server(self, websocket):
-        async for message in websocket:
-            message = json.loads(message)
-            req_type = REQUEST_RESPONSE_TYPE_MAP[message["type"]][0]
-            if (handler := self.handlers.get(message["type"])) is not None:
-                await websocket.send(
-                    asdict(await handler(req_type(**message["data"])))
-                )
+    async def handle(self, message):
+        req_type = REQUEST_RESPONSE_TYPE_MAP[message["type"]][0]
+        if (handler := self.handlers.get(message["type"])) is not None:
+            await websocket.send(
+                asdict(await handler(req_type(**message["data"])))
+            )
 
 
 async def main():
@@ -56,8 +54,8 @@ async def main():
     registry = ToolRegistry(client)
     registry.register_tool("SerperDevTool", crewai_tools.SerperDevTool())
 
-    async with serve(AgentRegistry(registry).server, "localhost", 8000):
-        await asyncio.get_running_loop().create_future()
+    agent_registry = AgentRegistry(registry)
 
+    uvicorn.run(create_api(agent_registry, registry), host="0.0.0.0", port=8000)
 
 asyncio.run(main())
