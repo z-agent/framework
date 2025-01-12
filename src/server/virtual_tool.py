@@ -32,14 +32,13 @@ def create_virtual_tool(remote_tool: RemoteTool, execute):
         __qualname__ = remote_tool.class_name
         __name__ = remote_tool.class_name
 
-        name: str = remote_tool.name
+        name: str = remote_tool.class_name
         description: str = remote_tool.description
         args_schema: Type[BaseModel] = create_model_from_json_schema(
             remote_tool.class_name, remote_tool.model_dict
         )
 
         def _run(self, **kwargs):
-            print("EXECUTING TOOL", remote_tool.name)
             return execute(remote_tool, kwargs)
 
     return VirtualTool()

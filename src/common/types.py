@@ -14,7 +14,7 @@ class AgentMetadataRequest:
 
 @dataclass
 class RemoteTool:
-    class_tool_id: str
+    class_name: str
 
     tool_id: str
     description: str
@@ -30,6 +30,30 @@ class AgentExecuteRequest:
 @dataclass
 class AgentExecuteResponse:
     response: str
+
+
+@dataclass
+class Agent:
+    role: str
+    goal: str
+    backstory: str
+    agent_tools: list[str]
+
+
+@dataclass
+class Task:
+    description: str
+    expected_output: str
+    agent: str
+
+
+@dataclass
+class Workflow:
+    name: str
+    description: str
+    arguments: list[str]  # list of arguments accepted
+    agents: dict[str, Agent]
+    tasks: dict[str, Task]
 
 
 REQUEST_RESPONSE_TYPE_MAP = {
