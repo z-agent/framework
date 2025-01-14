@@ -25,3 +25,15 @@ In-depth API specifications can be found at the `/docs` endpoint of the backend
 
 - `/agent_call`
   - Takes an agent ID along with the arguments to be passed for execution. The agent workflow is internally executed on the backend by dynamically constructing a `crewAI` crew and providing it the necessary tools, returning the raw response
+
+## Installation
+
+The backend requires a hefty list of (transitive) dependencies that can be installed as follows:
+
+```bash
+$ python3 -m venv ./env
+$ . ./env/bin/activate
+$ pip install -r requirements.txt
+```
+
+Then, the server can be run with `python3 -m src.server.main` to expose a server accessible at port `8000`. Make sure that the `OPENAI_API_KEY` and `SERPER_API_KEY` (required for the serper search tool) environment variables are set.
