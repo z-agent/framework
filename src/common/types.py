@@ -1,5 +1,5 @@
 from enum import StrEnum
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 
 
 class MessageType(StrEnum):
@@ -45,6 +45,7 @@ class Task:
     description: str
     expected_output: str
     agent: str
+    context: list[str] = field(default_factory=list)
 
 
 @dataclass
