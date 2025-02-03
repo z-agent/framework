@@ -20,9 +20,11 @@ from ..common.types import (
 )
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
+from dacite import from_dict
 import threading
 import os
 from .virtual_tool import create_virtual_tool
+from .util import tsort
 
 AGENTS_COLLECTION = "agents"
 TOOLS_COLLECTION = "tools"
@@ -48,8 +50,15 @@ def generate_task_fn(task_name):
 
 class Registry:
     def __init__(self, qdrant_client):
-        qdrant_client.delete_collection(AGENTS_COLLECTION)
-        qdrant_client.delete_collection(TOOLS_COLLECTION)
+        try:
+            qdrant_client.delete_collection(AGENTS_COLLECTION)
+        except Exception:
+            pass
+
+        try:
+            qdrant_client.delete_collection(TOOLS_COLLECTION)
+        except Exception:
+            pass
 
         if not qdrant_client.collection_exists(AGENTS_COLLECTION):
             qdrant_client.create_collection(
@@ -72,8 +81,6 @@ class Registry:
             MessageType.AGENT_METADATA: self.handle_agent_metadata,
             MessageType.AGENT_EXECUTE: self.handle_agent_execute,
         }
-        # Lock for writing config file
-        self.lock = threading.Lock()
 
     def create_virtual_tools(self, tools: list[str]):
         virtual_tools = []
@@ -89,37 +96,36 @@ class Registry:
         return virtual_tools
 
     def generate_crew(self, workflow: Workflow):
-        class GeneratedCrew:
-            @crew
-            def crew(self) -> Crew:
-                return Crew(
-                    agents=self.agents,
-                    tasks=self.tasks,
-                    process=Process.sequential,
-                    verbose=True,
-                )
-
-        for agent_name, config in workflow.agents.items():
-            fn = generate_agent_fn(
-                agent_name, self.create_virtual_tools(config["agent_tools"])
+        agents = {}
+        for agent, config in workflow.agents.items():
+            agents[agent] = Agent(
+                role=config.role,
+                goal=config.goal,
+                backstory=config.backstory,
+                tools=self.create_virtual_tools(config.agent_tools),
+                verbose=True,
             )
-            setattr(GeneratedCrew, agent_name, fn)
 
-        for task_name in workflow.tasks:
-            fn = generate_task_fn(task_name)
-            setattr(GeneratedCrew, task_name, fn)
+        tasks = {}
+        for task in tsort(
+            {
+                task_name: task.context
+                for task_name, task in workflow.tasks.items()
+            }
+        ):
+            config = workflow.tasks[task]
+            tasks[task] = Task(
+                description=config.description,
+                expected_output=config.expected_output,
+                agent=agents[config.agent],
+                context=[tasks[task] for task in config.context],
+            )
 
-        # We must generate the files here as the CrewBase class does not accept
-        # `dict` objects along with a lock as multiple agents can be run concurrently
-        with self.lock:
-            os.makedirs("config", exist_ok=True)
-
-            with open("config/agents.yaml", "w") as f:
-                yaml.dump(workflow.agents, f)
-            with open("config/tasks.yaml", "w") as f:
-                yaml.dump(workflow.tasks, f)
-
-            return CrewBase(GeneratedCrew)()
+        return Crew(
+            agents=agents.values(),
+            tasks=tasks.values(),
+            process=Process.sequential,
+        )
 
     def register_tool(self, tool_id: str, tool: BaseTool):
         if tool_id in self.tools:
@@ -207,7 +213,7 @@ class Registry:
         workflow = self.qdrant_client.retrieve(
             collection_name=AGENTS_COLLECTION, ids=[agent_id]
         )[0]
-        workflow = Workflow(**workflow.payload)
+        workflow = from_dict(data_class=Workflow, data=workflow.payload)
 
         for argument in arguments.keys():
             if argument not in workflow.arguments:
@@ -215,7 +221,7 @@ class Registry:
                     f"invalid argument {argument}, valid: {workflow.arguments}"
                 )
 
-        return self.generate_crew(workflow).crew().kickoff(inputs=arguments)
+        return self.generate_crew(workflow).kickoff(inputs=arguments)
 
     async def handle_agent_metadata(
         self, data: AgentMetadataRequest
