@@ -6,20 +6,27 @@ from crewai.tools import BaseTool
 import inspect
 import typing
 from pydantic import Field, BaseModel, create_model
+from solders.pubkey import Pubkey
 
 
 # Check whether the argument is marked as optional with the
 # typing.Optional hint
 def is_optional_arg(annotation):
     return isinstance(annotation, typing._GenericAlias) and (
-        annotation.__origin__ is Union and type(None) in annotation.__args__
+        annotation.__origin__ is typing.Union
+        and type(None) in annotation.__args__
     )
 
 
 def gen_tool(method_name, method):
     model_fields = {}
+    arg_type_mapping = {}
 
     for arg, arg_type in typing.get_type_hints(method).items():
+        if arg_type == Pubkey:
+            arg_type_mapping[arg] = Pubkey.from_string
+            arg_type = str
+
         if not (arg_type in (bool, str, int, float, type(None))):
             if is_optional_arg(arg_type):
                 continue
@@ -47,6 +54,11 @@ def gen_tool(method_name, method):
 
         def _run(self, **kwargs):
             print(f"Invoked {method_name}: {kwargs}")
+
+            for arg in kwargs:
+                if arg in arg_type_mapping:
+                    kwargs[arg] = arg_type_mapping[arg](kwargs[arg])
+
             return asyncio.run(method(**kwargs))
 
     return Tool()
@@ -61,6 +73,7 @@ def gen_tools():
         if method_name.startswith("_"):
             continue
         if method_name not in {
+            "trade",
             "fetch_price",
             "get_tps",
             "stake",
