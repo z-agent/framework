@@ -4,7 +4,7 @@ from sentence_transformers import SentenceTransformer
 import asyncio
 from dataclasses import asdict
 import json
-import crewai_tools
+import logging
 import uuid
 from qdrant_client import QdrantClient
 from qdrant_client.models import VectorParams, Distance
@@ -29,6 +29,7 @@ from .util import tsort
 AGENTS_COLLECTION = "agents"
 TOOLS_COLLECTION = "tools"
 
+logger = logging.getLogger(__name__)
 
 def generate_agent_fn(agent_name, tools):
     @agent
@@ -49,7 +50,7 @@ def generate_task_fn(task_name):
 
 
 class Registry:
-    def __init__(self, qdrant_client):
+    def __init__(self, qdrant_client: QdrantClient):
         try:
             qdrant_client.delete_collection(AGENTS_COLLECTION)
         except Exception:
@@ -60,23 +61,28 @@ class Registry:
         except Exception:
             pass
 
-        if not qdrant_client.collection_exists(AGENTS_COLLECTION):
-            qdrant_client.create_collection(
-                collection_name=AGENTS_COLLECTION,
-                vectors_config=VectorParams(
-                    size=384, distance=Distance.COSINE
-                ),
-            )
-        if not qdrant_client.collection_exists(TOOLS_COLLECTION):
-            qdrant_client.create_collection(
-                collection_name=TOOLS_COLLECTION,
-                vectors_config=VectorParams(
-                    size=384, distance=Distance.COSINE
-                ),
-            )
+        try:
+            if not qdrant_client.collection_exists(AGENTS_COLLECTION):
+                qdrant_client.create_collection(
+                    collection_name=AGENTS_COLLECTION,
+                    vectors_config=VectorParams(
+                        size=384, distance=Distance.COSINE
+                    ),
+                )
+            if not qdrant_client.collection_exists(TOOLS_COLLECTION):
+                qdrant_client.create_collection(
+                    collection_name=TOOLS_COLLECTION,
+                    vectors_config=VectorParams(
+                        size=384, distance=Distance.COSINE
+                    ),
+                )
+        except Exception as e:
+            logger.error(f"Error creating collections: {e}", exc_info=True)
+
         self.qdrant_client = qdrant_client
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
         self.tools = {}
+        self.tool_ids = {}  # Mapping from tool ID to UUID
         self.handlers = {
             MessageType.AGENT_METADATA: self.handle_agent_metadata,
             MessageType.AGENT_EXECUTE: self.handle_agent_execute,
@@ -128,7 +134,7 @@ class Registry:
         )
 
     def register_tool(self, tool_id: str, tool: BaseTool):
-        if tool_id in self.tools:
+        if tool_id in self.tool_ids:
             raise ValueError(f"{tool_id} already in tools")
 
         tool_uuid = str(uuid.uuid4())
@@ -158,6 +164,7 @@ class Registry:
                 model_dict=tool.args_schema.model_json_schema(),
             ),
         )
+        self.tool_ids[tool_id] = tool_uuid
 
         return tool_uuid
 
@@ -178,8 +185,10 @@ class Registry:
             agents_list.append(agent_name)
             # Ensure that we only refer to tools that exist
             for tool in agent_obj.agent_tools:
-                if tool not in self.tools:
+                if tool not in self.tool_ids:
                     raise ValueError(f"tool {tool} does not exist")
+                # Replace tool ID with UUID
+                agent_obj.agent_tools[agent_obj.agent_tools.index(tool)] = self.tool_ids[tool]
 
         for task in workflow.tasks.values():
             if task.agent not in agents_list:
