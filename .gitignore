@@ -16,3 +16,6 @@ temp/*
 .mypy_cache
 .ruff_cache
 .venv
+node_modules/*
+# all node_modules
+src/webapp/node_modules/*
