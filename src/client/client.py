@@ -53,7 +53,7 @@ def main():
 
         # Execute trade using agentipy tools
         query = f"Trade {args.qty} qty to token {args.token} with {args.slippage} bps slippage"
-        call_response = requests.get(
+        call_response = requests.post(
             f"{base}/agent_call?agent_id={agent['agent_id']}",
             json={"query": query}
         )

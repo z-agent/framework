@@ -51,33 +51,21 @@ def generate_task_fn(task_name):
 
 class Registry:
     def __init__(self, qdrant_client: QdrantClient):
-        try:
-            qdrant_client.delete_collection(AGENTS_COLLECTION)
-        except Exception:
-            pass
+        if not qdrant_client.collection_exists(AGENTS_COLLECTION):
+            qdrant_client.create_collection(
+                collection_name=AGENTS_COLLECTION,
+                vectors_config=VectorParams(
+                    size=384, distance=Distance.COSINE
+                ),
+            )
 
-        try:
-            qdrant_client.delete_collection(TOOLS_COLLECTION)
-        except Exception:
-            pass
-
-        try:
-            if not qdrant_client.collection_exists(AGENTS_COLLECTION):
-                qdrant_client.create_collection(
-                    collection_name=AGENTS_COLLECTION,
-                    vectors_config=VectorParams(
-                        size=384, distance=Distance.COSINE
-                    ),
-                )
-            if not qdrant_client.collection_exists(TOOLS_COLLECTION):
-                qdrant_client.create_collection(
-                    collection_name=TOOLS_COLLECTION,
-                    vectors_config=VectorParams(
-                        size=384, distance=Distance.COSINE
-                    ),
-                )
-        except Exception as e:
-            logger.error(f"Error creating collections: {e}", exc_info=True)
+        if not qdrant_client.collection_exists(TOOLS_COLLECTION):
+            qdrant_client.create_collection(
+                collection_name=TOOLS_COLLECTION,
+                vectors_config=VectorParams(
+                    size=384, distance=Distance.COSINE
+                ),
+            )
 
         self.qdrant_client = qdrant_client
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -137,7 +125,7 @@ class Registry:
         if tool_id in self.tool_ids:
             raise ValueError(f"{tool_id} already in tools")
 
-        tool_uuid = str(uuid.uuid4())
+        tool_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, tool_id + tool.description))
 
         self.qdrant_client.upsert(
             collection_name=TOOLS_COLLECTION,
@@ -185,16 +173,18 @@ class Registry:
             agents_list.append(agent_name)
             # Ensure that we only refer to tools that exist
             for tool in agent_obj.agent_tools:
-                if tool not in self.tool_ids:
-                    raise ValueError(f"tool {tool} does not exist")
-                # Replace tool ID with UUID
-                agent_obj.agent_tools[agent_obj.agent_tools.index(tool)] = self.tool_ids[tool]
+                if tool not in self.tools:
+                    try:
+                        # Replace tool ID with UUID
+                        agent_obj.agent_tools[agent_obj.agent_tools.index(tool)] = self.tool_ids[tool]
+                    except KeyError:
+                        raise ValueError(f"tool {tool} does not exist")
 
         for task in workflow.tasks.values():
             if task.agent not in agents_list:
                 raise ValueError(f"agent {task.agent} not defined")
 
-        agent_uuid = str(uuid.uuid4())
+        agent_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, workflow.name + workflow.description))
 
         self.qdrant_client.upsert(
             collection_name=AGENTS_COLLECTION,
