@@ -39,9 +39,10 @@ colorama==0.4.6
 coloredlogs==15.0.1
 construct==2.10.68
 construct-typing==0.5.6
-crewai==0.95.0
+crewai @ git+https://github.com/vistara-dev/crewAI.git@5dfbcd6817ad489f0ef5549c8ba1878914ba36d5
 crewai-tools==0.25.8
-cryptography==44.0.0
+cryptography==43.0.3
+dacite==1.9.1
 dataclasses-json==0.6.7
 decorator==5.1.1
 Deprecated==1.2.15
@@ -65,6 +66,7 @@ fastavro==1.10.0
 filelock==3.16.1
 flake8==7.1.1
 flatbuffers==24.12.23
+frozendict==2.4.6
 frozenlist==1.5.0
 fsspec==2024.12.0
 google-api-core==2.24.0
@@ -89,6 +91,7 @@ grpcio-tools==1.68.1
 h11==0.14.0
 h2==4.1.0
 hpack==4.0.0
+html5lib==1.1
 httpcore==1.0.7
 httptools==0.6.4
 httpx==0.27.2
@@ -138,6 +141,7 @@ linkup-sdk==0.2.1
 litellm==1.56.10
 logfire-api==3.3.0
 loguru==0.7.3
+lxml==5.3.0
 Mako==1.3.8
 markdown-it-py==3.0.0
 MarkupSafe==3.0.2
@@ -152,6 +156,7 @@ monotonic==1.6
 more-itertools==8.14.0
 mpmath==1.3.0
 multidict==6.1.0
+multitasking==0.0.11
 mypy-extensions==1.0.0
 networkx==3.4.2
 nh3==0.2.20
@@ -194,6 +199,7 @@ parso==0.8.4
 pathspec==0.12.1
 pdfminer.six==20231228
 pdfplumber==0.11.5
+peewee==3.17.8
 pexpect==4.9.0
 pillow==11.1.0
 platformdirs==4.3.6
@@ -319,10 +325,12 @@ virtualenv==20.29.1
 watchfiles==1.0.3
 wcwidth==0.2.13
 weaviate-client==4.10.2
+webencodings==0.5.1
 websocket-client==1.8.0
 websockets==10.4
 wheel==0.45.1
 wrapt==1.17.0
 wsproto==1.2.0
 yarl==1.18.3
+yfinance==0.2.52
 zipp==3.21.0
