@@ -1,7 +1,7 @@
 from crewai.tools import BaseTool
 import yaml
-from sentence_transformers import SentenceTransformer
 import asyncio
+import openai
 from dataclasses import asdict
 import json
 import logging
@@ -28,8 +28,10 @@ from .util import tsort
 
 AGENTS_COLLECTION = "agents"
 TOOLS_COLLECTION = "tools"
+EMBEDDING_MODEL = "text-embedding-ada-002"
 
 logger = logging.getLogger(__name__)
+
 
 def generate_agent_fn(agent_name, tools):
     @agent
@@ -55,7 +57,7 @@ class Registry:
             qdrant_client.create_collection(
                 collection_name=AGENTS_COLLECTION,
                 vectors_config=VectorParams(
-                    size=384, distance=Distance.COSINE
+                    size=1536, distance=Distance.COSINE
                 ),
             )
 
@@ -63,12 +65,12 @@ class Registry:
             qdrant_client.create_collection(
                 collection_name=TOOLS_COLLECTION,
                 vectors_config=VectorParams(
-                    size=384, distance=Distance.COSINE
+                    size=1536, distance=Distance.COSINE
                 ),
             )
 
         self.qdrant_client = qdrant_client
-        self.model = SentenceTransformer("all-MiniLM-L6-v2")
+        self.openai_client = openai.Client()
         self.tools = {}
         self.tool_ids = {}  # Mapping from tool ID to UUID
         self.handlers = {
@@ -125,16 +127,21 @@ class Registry:
         if tool_id in self.tool_ids:
             raise ValueError(f"{tool_id} already in tools")
 
-        tool_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, tool_id + tool.description))
+        tool_uuid = str(
+            uuid.uuid5(uuid.NAMESPACE_DNS, tool_id + tool.description)
+        )
 
         self.qdrant_client.upsert(
             collection_name=TOOLS_COLLECTION,
             points=[
                 {
                     "id": tool_uuid,
-                    "vector": self.model.encode(
-                        tool_id + "\n" + tool.description
-                    ),
+                    "vector": self.openai_client.embeddings.create(
+                        input=tool_id + "\n" + tool.description,
+                        model=EMBEDDING_MODEL,
+                    )
+                    .data[0]
+                    .embedding,
                     "payload": {
                         "id": tool_id,
                         "description": tool.description,
@@ -159,7 +166,11 @@ class Registry:
     def find_tools(self, query: str):
         return self.qdrant_client.search(
             collection_name=TOOLS_COLLECTION,
-            query_vector=self.model.encode(query).tolist(),
+            query_vector=self.openai_client.embeddings.create(
+                input=query, model=EMBEDDING_MODEL
+            )
+            .data[0]
+            .embedding,
             limit=5,
         )
 
@@ -176,7 +187,9 @@ class Registry:
                 if tool not in self.tools:
                     try:
                         # Replace tool ID with UUID
-                        agent_obj.agent_tools[agent_obj.agent_tools.index(tool)] = self.tool_ids[tool]
+                        agent_obj.agent_tools[
+                            agent_obj.agent_tools.index(tool)
+                        ] = self.tool_ids[tool]
                     except KeyError:
                         raise ValueError(f"tool {tool} does not exist")
 
@@ -184,16 +197,23 @@ class Registry:
             if task.agent not in agents_list:
                 raise ValueError(f"agent {task.agent} not defined")
 
-        agent_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, workflow.name + workflow.description))
+        agent_uuid = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_DNS, workflow.name + workflow.description
+            )
+        )
 
         self.qdrant_client.upsert(
             collection_name=AGENTS_COLLECTION,
             points=[
                 {
                     "id": agent_uuid,
-                    "vector": self.model.encode(
-                        workflow.name + "\n" + workflow.description
-                    ),
+                    "vector": self.openai_client.embeddings.create(
+                        input=workflow.name + "\n" + workflow.description,
+                        model=EMBEDDING_MODEL,
+                    )
+                    .data[0]
+                    .embedding,
                     "payload": asdict(workflow),
                 }
             ],
@@ -204,7 +224,11 @@ class Registry:
     def find_agents(self, query: str):
         return self.qdrant_client.search(
             collection_name=AGENTS_COLLECTION,
-            query_vector=self.model.encode(query).tolist(),
+            query_vector=self.openai_client.embeddings.create(
+                input=query, model=EMBEDDING_MODEL
+            )
+            .data[0]
+            .embedding,
             limit=5,
         )
 

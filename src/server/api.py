@@ -5,8 +5,10 @@ from pydantic import BaseModel
 from .registry import Registry
 from ..common.types import Workflow, Agent, Task
 
+
 class AgentCallRequest(BaseModel):
     query: str
+
 
 class AgentConfig(BaseModel):
     role: str
@@ -14,11 +16,13 @@ class AgentConfig(BaseModel):
     backstory: str
     agent_tools: list[str]
 
+
 class TaskConfig(BaseModel):
     description: str
     expected_output: str
     agent: str
     context: list[str] = []
+
 
 class WorkflowRequest(BaseModel):
     name: str
@@ -26,6 +30,7 @@ class WorkflowRequest(BaseModel):
     arguments: list[str]
     agents: Dict[str, AgentConfig]
     tasks: Dict[str, TaskConfig]
+
 
 def create_api(registry: Registry):
     app = FastAPI()
@@ -63,7 +68,7 @@ def create_api(registry: Registry):
                 tasks={
                     name: Task(**task_config.dict())
                     for name, task_config in workflow_request.tasks.items()
-                }
+                },
             )
             agent_id = registry.register_agent(workflow)
             return {"agent_id": agent_id}
