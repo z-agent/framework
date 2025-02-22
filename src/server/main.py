@@ -1,6 +1,7 @@
 import crewai_tools
 import uvicorn
 from qdrant_client import QdrantClient
+from os import environ
 
 from .api import create_api
 from .registry import Registry
@@ -13,7 +14,7 @@ from ..tools.stock import (
 
 
 def main():
-    client = QdrantClient(host="localhost", port=6333)
+    client = QdrantClient(host=environ["QDRANT_HOST"], port=int(environ["QDRANT_PORT"]), api_key=environ["QDRANT_API_KEY"])
 
     registry = Registry(client)
 
