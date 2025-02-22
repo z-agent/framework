@@ -37,7 +37,7 @@ colorama==0.4.6
 coloredlogs==15.0.1
 construct==2.10.68
 construct-typing==0.5.6
-crewai @ git+https://github.com/vistara-dev/crewAI@5dfbcd6817ad489f0ef5549c8ba1878914ba36d5
+crewai @ git+https://github.com/vistara-dev/crewAI.git@9956cad7827797ac13391d153e13c9253f53d4f9
 crewai-tools==0.36.0
 cryptography==44.0.1
 dacite==1.9.2
