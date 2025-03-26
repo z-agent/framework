@@ -10,7 +10,7 @@ from solders.pubkey import Pubkey
 import requests
 
 
-SOLANA_RPC="https://mainnet.helius-rpc.com/?api-key=d4153e53-a035-42f8-a25f-a10ecbea0704"
+SOLANA_RPC="https://api.mainnet-beta.solana.com/"
 
 class TokenSchema(BaseModel):
     token_address: str = Field(..., description="Solana token address")
