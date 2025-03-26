@@ -262,3 +262,16 @@ class Registry:
         req_type = REQUEST_RESPONSE_TYPE_MAP[message["type"]][0]
         if (handler := self.handlers.get(message["type"])) is not None:
             return asdict(await handler(req_type(**message["data"])))
+
+    def list_agents(self):
+        return self.qdrant_client.scroll(
+            collection_name=AGENTS_COLLECTION,
+            # scroll_filter=Filter(should=[TextMatch(text=query)], limit=limit),
+        )
+
+    def list_tools(self):
+        # return self.qdrant_client.get_collection(TOOLS_COLLECTION)
+        return self.qdrant_client.scroll(
+            collection_name=TOOLS_COLLECTION,
+            # scroll_filter=Filter(should=[TextMatch(text=query)], limit=limit),
+        )

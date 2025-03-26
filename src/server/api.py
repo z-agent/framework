@@ -92,4 +92,8 @@ def create_api(registry: Registry):
     def agent_list():
         return registry.list_agents()
 
+    @app.get("/tool_list")
+    def tool_list():
+        return registry.list_tools()
+
     return app
