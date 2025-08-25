@@ -23,8 +23,8 @@ redis==5.0.1
 solana==0.32.0
 solders==0.19.0
 
-# Finance (optional - can be disabled)
-# yfinance==0.2.35
+# Finance
+yfinance==0.2.35
 
 # Utilities
 httpx==0.26.0
