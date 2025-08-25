@@ -1,0 +1,39 @@
+# EXACT versions from working z-agents conda environment
+python-dotenv
+pydantic==2.9.2
+fastapi==0.109.2
+uvicorn==0.25.0
+
+# Let crewai handle all its dependencies
+crewai==0.134.0
+crewai-tools==0.49.0
+
+# Exact versions from your working environment
+qdrant-client==1.14.3
+solana==0.35.1
+supabase==2.10.0
+dacite==1.9.2
+
+# Pin LLM deps compatible with CrewAI
+httpx
+litellm==1.72.0
+openai==1.75.0
+
+# Qdrant fast embed support
+fastembed
+
+# Embeddings used in registry
+sentence-transformers
+
+# Missing dependency that code imports
+Pillow
+
+# FastAPI file upload dependency
+python-multipart
+
+# Opentelemetry dependencies from your working environment
+opentelemetry-instrumentation-fastapi
+opentelemetry-api
+opentelemetry-sdk
+
+# Note: These versions match your working z-agents environment
