@@ -21,7 +21,7 @@ redis==5.0.1
 
 # Solana and Web3
 solana==0.32.0
-solders==0.19.0
+solders==0.20.0
 
 # Finance
 yfinance==0.2.35
