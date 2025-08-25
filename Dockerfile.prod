@@ -24,8 +24,8 @@ RUN useradd --create-home --shell /bin/bash app
 # Set working directory
 WORKDIR /app
 
-# Copy production requirements first for better caching
-COPY requirements.prod.txt requirements.txt
+# Copy requirements first for better caching
+COPY requirements.txt requirements.txt
 
 # Install Python dependencies
 RUN --mount=type=cache,target=/root/.cache/pip \
