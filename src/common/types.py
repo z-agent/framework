@@ -1,12 +1,45 @@
-from enum import StrEnum
+from enum import Enum
 from dataclasses import dataclass, asdict, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Any, Optional, Union
 from pydantic import BaseModel
+import base64
 
 
-class MessageType(StrEnum):
-    AGENT_METADATA = "AGENT_METADATA"  # Request agent metadata
-    AGENT_EXECUTE = "AGENT_EXECUTE"  # Execute the tool
+class MessageType(str, Enum):
+    AGENT_METADATA = "agent_metadata"
+    AGENT_EXECUTE = "agent_execute"
+
+
+class MediaType(str, Enum):
+    TEXT = "text"
+    IMAGE = "image"
+    AUDIO = "audio"
+    VIDEO = "video"
+    DOCUMENT = "document"
+
+
+class MediaContent(BaseModel):
+    """Multi-modal content representation"""
+    type: MediaType
+    content: Union[str, bytes]  # Text or base64 encoded media
+    mime_type: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class MultiModalRequest(BaseModel):
+    """Request with multi-modal content"""
+    query: str
+    media: Optional[List[MediaContent]] = None
+    context: Optional[Dict[str, Any]] = None
+
+
+class MultiModalTool(BaseModel):
+    """Multi-modal tool definition"""
+    name: str
+    description: str
+    supported_media: List[MediaType]
+    input_schema: Dict[str, Any]
+    output_schema: Dict[str, Any]
 
 
 @dataclass

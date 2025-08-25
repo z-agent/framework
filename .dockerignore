@@ -1,0 +1,105 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+.ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+log/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Documentation
+*.md
+docs/
+README*
+
+# Extra ignores to shrink context
+work_logs/
+demos/
+proof_vault/
+supabase/
+*.session
+*.ipynb
+test_*.py
+tests/
+node_modules/
+venv/
+.venv/
+*.log
+
+# Tests
+test_*
+*_test.py
+tests/
+pytest.ini
+
+# Development
+*.ipynb
+.ipynb_checkpoints/
+node_modules/
+package*.json
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Large files
+*.zip
+*.tar.gz
+*.rar
