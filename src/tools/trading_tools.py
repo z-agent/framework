@@ -4,7 +4,7 @@ import pandas as pd
 import asyncio
 import concurrent.futures
 from crewai.tools import BaseTool
-from crewai_tools import SerperDevTool
+# from crewai_tools import SerperDevTool  # Commented out due to import issues
 from pydantic import BaseModel, Field
 from typing import Type, Optional
 from src.vendor.ivishx.data_sources import CoinGeckoClient
@@ -12,7 +12,7 @@ from src.vendor.ivishx.strategy import IvishXAnalyzer
 
 # Using SerperDevTool for Twitter sentiment as suggested.
 # You will need to set the SERPER_API_KEY environment variable.
-twitter_sentiment_tool = SerperDevTool(name="TwitterSentiment", description="Search Twitter for coin sentiment")
+# twitter_sentiment_tool = SerperDevTool(name="TwitterSentiment", description="Search Twitter for coin sentiment")  # Commented out
 
 class CoinSchema(BaseModel):
     coin: str = Field(..., description="The symbol or mint address of the coin, e.g., 'TOSHI'")
@@ -109,6 +109,7 @@ class IvishXAnalyzeTool(BaseTool):
     args_schema: Type[BaseModel] = IvishXArgs
 
     def _run(self, symbol: str, days: int = 30) -> dict:
+        print(f"Running IvishX analysis for {symbol} with {days} days")
         try:
             cg = CoinGeckoClient()
             df = cg.ohlc(symbol, days=days)
@@ -132,40 +133,68 @@ class IvishXAnalyzeTool(BaseTool):
                     "volume": float(row['volume']) if 'volume' in row and pd.notna(row['volume']) else 0.0
                 })
             
+            # Ensure all required fields exist and have proper types
+            signal_type = signal.get('type', 'WAIT')
+            confidence = int(signal.get('confidence', 0))
+            entry = float(signal.get('entry', 0.0))
+            stop_loss = float(signal.get('stop_loss', 0.0))
+            tp1 = float(signal.get('tp1', 0.0))
+            tp2 = float(signal.get('tp2', 0.0))
+            rr = float(signal.get('rr', 0.0))
+            reasons = signal.get('reasons', [])
+            
+            # Ensure confluence data exists
+            price = float(confluence.get('price', 0.0))
+            rsi = float(confluence.get('rsi', 50.0))
+            macd = float(confluence.get('macd', 0.0))
+            macd_signal = float(confluence.get('macd_signal', 0.0))
+            ema_data = confluence.get('ema', (0.0, 0.0, 0.0, 0.0, 0.0))
+            fib50 = float(confluence.get('fib50', 0.0))
+            fib618 = float(confluence.get('fib618', 0.0))
+            long_score = int(confluence.get('long', {}).get('score', 0))
+            short_score = int(confluence.get('short', {}).get('score', 0))
+            
+            # Ensure structure data exists
+            structure_trend = structure.get('structure_trend', 'NEUTRAL')
+            swing_highs = structure.get('swing_highs', [])
+            swing_lows = structure.get('swing_lows', [])
+            bos_signals = structure.get('bos_signals', [])
+            choch_signals = structure.get('choch_signals', [])
+            
             # Create trading signal response that matches frontend expectations
             result = {
                 "success": True,
                 "symbol": symbol,
                 "signal": {
-                    "type": signal['type'],
-                    "confidence": signal['confidence'],
-                    "entry": signal['entry'],
-                    "stop_loss": signal['stop_loss'],
-                    "stopLoss": signal['stop_loss'],  # Frontend expects camelCase
-                    "tp1": signal['tp1'],
-                    "tp2": signal['tp2'],
-                    "rr": signal['rr'],
-                    "reasons": signal['reasons']
+                    "type": signal_type,
+                    "confidence": confidence,
+                    "entry": entry,
+                    "stop_loss": stop_loss,
+                    "stopLoss": stop_loss,  # Frontend expects camelCase
+                    "tp1": tp1,
+                    "tp2": tp2,
+                    "rr": rr,
+                    "reasons": reasons
                 },
                 "confluence": {
-                    "price": confluence['price'],
-                    "rsi": confluence['rsi'],
-                    "macd": confluence['macd'],
-                    "macd_signal": confluence['macd_signal'],
-                    "ema": confluence['ema'],
-                    "fib50": confluence['fib50'],
-                    "fib618": confluence['fib618'],
-                    "long_score": confluence['long']['score'],
-                    "short_score": confluence['short']['score']
+                    "price": price,
+                    "rsi": rsi,
+                    "macd": macd,
+                    "macd_signal": macd_signal,
+                    "ema": ema_data,
+                    "fib50": fib50,
+                    "fib618": fib618,
+                    "long_score": long_score,
+                    "short_score": short_score
                 },
                 "structure": {
-                    "trend": structure['structure_trend'],
-                    "swing_highs": structure['swing_highs'],
-                    "swing_lows": structure['swing_lows'],
-                    "bos_signals": structure['bos_signals'],
-                    "choch_signals": structure['choch_signals']
+                    "trend": structure_trend,
+                    "swing_highs": swing_highs,
+                    "swing_lows": swing_lows,
+                    "bos_signals": bos_signals,
+                    "choch_signals": choch_signals
                 },
-                "latest": analysis['latest'],
+                "latest": analysis.get('latest', {}),
                 "ohlc_data": ohlc_data,  # Full OHLC for charting
                 "timestamp": pd.Timestamp.now().isoformat(),
                 "timeframe": f"{days}d",
@@ -174,13 +203,18 @@ class IvishXAnalyzeTool(BaseTool):
                 "data": {symbol: analysis}
             }
             
-            
             return result
             
         except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Error in IvishX analysis for {symbol}: {str(e)}")
+            print(f"Full traceback: {error_details}")
+            
             return {
                 "success": False, 
                 "error": str(e),
+                "error_details": error_details,
                 "symbol": symbol,
                 "signal": {
                     "type": "ERROR",
@@ -279,6 +313,7 @@ class CombinedTechnicalAnalysis(BaseTool):
     def _run_ivishx(self, symbol: str, days: int) -> dict:
         """Run IvishX analysis"""
         ivishx_tool = IvishXAnalyzeTool()
+        print(f"Running IvishX analysis for {symbol} with {days} days")
         return ivishx_tool._run(symbol, days)
 
     def _run_zapi(self, symbol: str, timeframe: str) -> dict:
@@ -301,6 +336,7 @@ class CombinedTechnicalAnalysis(BaseTool):
     def _run(self, symbol: str, days: int = 30, timeframe: str = "7d") -> dict:
         """Run both analyses in parallel"""
         try:
+            print(f"Running CombinedTechnicalAnalysis for {symbol} with {days} days and {timeframe} timeframe")
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
                 # Submit both tasks
                 ivishx_future = executor.submit(self._run_ivishx, symbol, days)

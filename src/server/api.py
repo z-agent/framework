@@ -1,5 +1,5 @@
 from typing import Union, Dict, Optional, Any, List
-from fastapi import FastAPI, HTTPException, UploadFile, File, Request, APIRouter
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request, APIRouter, Response
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -302,6 +302,7 @@ def create_api(registry: Registry):
                 # Persist assistant message and execution
                 chat_storage.append_message(session_id, "assistant", result_text)
                 execution_storage.store_execution(agent_id, inputs, result_text)
+                # No extra execution monitor context coupling
 
                 # Done
                 yield f"data: {json.dumps({'type': 'done', 'timestamp': datetime.now(timezone.utc).isoformat()})}\n\n"
@@ -320,7 +321,55 @@ def create_api(registry: Registry):
             },
         )
 
-    # Mount chat router without affecting existing routes
+    # Privy authentication router
+    privy_router = APIRouter()
+
+    class PrivySessionRequest(BaseModel):
+        telegram_user_id: int
+        privy_user_id: str
+        access_token: str
+        wallet_address: Optional[str] = None
+
+    @privy_router.post("/session")
+    async def save_privy_session(request: PrivySessionRequest):
+        """Save Privy session data for wallet export functionality"""
+        try:
+            # Import Supabase service here to avoid circular imports
+            import sys
+            import os
+            sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
+
+            # Initialize Supabase service
+            try:
+                from supabase_trading_service import get_trading_service
+                supabase_service = get_trading_service()
+            except Exception as e:
+                logger.error(f"Failed to initialize Supabase: {e}")
+                raise HTTPException(status_code=500, detail="Database not available")
+
+            # Save session data to Supabase
+            update_data = {
+                'privy_user_id': request.privy_user_id,
+                'session_signer': request.access_token,  # Store access token as session signer
+            }
+
+            if request.wallet_address:
+                update_data['wallet_address'] = request.wallet_address
+
+            success = await supabase_service.update_user(request.telegram_user_id, update_data)
+
+            if success:
+                logger.info(f"✅ Saved Privy session for user {request.telegram_user_id}")
+                return {"success": True, "message": "Session saved successfully"}
+            else:
+                raise HTTPException(status_code=500, detail="Failed to save session")
+
+        except Exception as e:
+            logger.error(f"Failed to save Privy session: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # Mount routers
+    app.include_router(privy_router, prefix="/privy", tags=["privy"])
     app.include_router(chat_router, prefix="/chat", tags=["chat"])
 
     @app.websocket("/agent_ws")
@@ -397,10 +446,25 @@ def create_api(registry: Registry):
             raise HTTPException(status_code=500, detail=f"Tool execution failed: {str(e)}")
 
     @app.post("/agent_call")
-    def agent_call(agent_id: str, request: AgentCallRequest):
+    def agent_call(agent_id: str, request: AgentCallRequest, response: Response):
         try:
             # Build arguments dict based on what was provided
             arguments: Dict[str, Any] = {}
+            
+            # Get the raw request data to handle direct parameter passing
+            request_dict = request.model_dump(exclude_none=True)
+            
+            # Handle direct parameter passing (like 'idea')
+            if "idea" in request_dict:
+                arguments["idea"] = request_dict["idea"]
+            if "mode" in request_dict:
+                arguments["mode"] = request_dict["mode"]
+            if "complexity_level" in request_dict:
+                arguments["complexity_level"] = request_dict["complexity_level"]
+            if "project_id" in request_dict:
+                arguments["project_id"] = request_dict["project_id"]
+            
+            # Handle standard fields
             if request.query is not None:
                 arguments["query"] = request.query
             if request.task is not None:
@@ -408,16 +472,35 @@ def create_api(registry: Registry):
             if request.context is not None:
                 arguments["context"] = request.context
             
-            # Add any additional fields from the request, ignore nulls/unknowns gracefully
-            request_dict = request.model_dump(exclude_none=True)
+            # Add any other additional fields from the request, ignore nulls/unknowns gracefully
             for key, value in request_dict.items():
-                if key not in ["query", "task", "context", "media"]:
+                if key not in ["query", "task", "context", "media", "idea", "mode", "complexity_level", "project_id"]:
                     arguments[key] = value
             
             logger.info(f"Executing agent {agent_id} with arguments: {arguments}")
             result = registry.execute_agent(agent_id, arguments)
             logger.info(f"Agent execution completed successfully")
-            return result
+            
+            # Convert CrewOutput to serializable format if needed
+            if hasattr(result, 'raw'):
+                # CrewOutput object - extract the raw result
+                serializable_result = {
+                    "result": result.raw,
+                    "usage_metrics": getattr(result, 'usage_metrics', {}),
+                    "tasks_output": [
+                        {
+                            "description": task.description if hasattr(task, 'description') else str(task),
+                            "output": task.raw if hasattr(task, 'raw') else str(task)
+                        } for task in getattr(result, 'tasks_output', [])
+                    ]
+                }
+            else:
+                serializable_result = result
+            
+            # Set proper response headers to close connection
+            response.headers["Connection"] = "close"
+            
+            return serializable_result
             
         except Exception as e:
             logger.error(f"Agent call failed for agent_id {agent_id}: {str(e)}")
@@ -431,6 +514,56 @@ def create_api(registry: Registry):
                 error_detail += f" (Caused by: {str(e.__cause__)})"
             
             raise HTTPException(status_code=500, detail=error_detail)
+
+    @app.post("/direct_scope_agkit_idea")
+    def direct_scope_agkit_idea(request: AgentCallRequest, response: Response):
+        """Direct AgentKit idea scoping without agent overhead - most efficient approach"""
+        try:
+            # Import the direct function
+            from src.agents.scope_agkit_idea_agent import scope_agkit_idea_direct
+            
+            # Extract parameters from request
+            idea = request.arguments.get("idea") if request.arguments else None
+            if not idea:
+                # Try to get from other fields
+                idea = request.query or request.task or request.context
+                
+            if not idea:
+                raise HTTPException(status_code=400, detail="No idea provided. Please provide 'idea' in the request body.")
+            
+            mode = request.arguments.get("mode", "builder") if request.arguments else "builder"
+            complexity_level = request.arguments.get("complexity_level", "medium") if request.arguments else "medium"
+            project_id = request.arguments.get("project_id") if request.arguments else None
+            
+            logger.info(f"🚀 Direct AgentKit idea scoping: {idea[:100]}...")
+            
+            # Call the direct function (no agent, no LLM calls)
+            result = scope_agkit_idea_direct(
+                idea=idea,
+                mode=mode,
+                complexity_level=complexity_level,
+                project_id=project_id
+            )
+            
+            if "error" in result:
+                logger.error(f"❌ Direct scoping failed: {result['error']}")
+                raise HTTPException(status_code=500, detail=result['error'])
+            
+            logger.info(f"✅ Direct AgentKit idea scoped successfully")
+            
+            # Set proper response headers
+            response.headers["Connection"] = "close"
+            
+            return {
+                "success": True,
+                "message": "Direct AgentKit idea scoping completed successfully",
+                "result": result,
+                "efficiency": "No unnecessary LLM calls - direct tool execution"
+            }
+            
+        except Exception as e:
+            logger.error(f"Direct AgentKit idea scoping failed: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Direct scoping failed: {str(e)}")
 
     @app.post("/multimodal_agent_call")
     async def multimodal_agent_call(agent_id: str, request: MultiModalAgentCallRequest):

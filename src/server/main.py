@@ -14,6 +14,33 @@ try:
 except ImportError:
     TELEGRAM_TOOLS_AVAILABLE = False
     print("⚠️  Telegram tools not available. Run setup_telegram_reader.py to configure.")
+
+# Import Hyperliquid tools (will gracefully fail if dependencies missing)
+try:
+    from src.tools.hyperliquid_tools import HYPERLIQUID_TOOLS
+    HYPERLIQUID_TOOLS_AVAILABLE = True
+    print("✅ Hyperliquid builder code tools loaded - Ready to earn fees!")
+except ImportError as e:
+    HYPERLIQUID_TOOLS_AVAILABLE = False
+    print(f"⚠️  Hyperliquid tools not available: {e}")
+    print("💡 Install dependencies: pip install eth-account")
+    HYPERLIQUID_TOOLS = []
+
+# Import Ship-to-Earn tools
+try:
+    from src.tools.ship_to_earn_dev_team import (
+        ProjectManagerAgent,
+        SeniorDeveloperAgent,
+        QAEngineerAgent,
+        DevOpsEngineerAgent,
+        RevenueDistributionSystem
+    )
+    from src.workflows.ship_to_earn_workflow import register_ship_to_earn_workflows
+    SHIP_TO_EARN_AVAILABLE = True
+    print("💰 Ship-to-Earn AI dev team loaded - Ready to build and earn!")
+except ImportError as e:
+    SHIP_TO_EARN_AVAILABLE = False
+    print(f"⚠️  Ship-to-Earn tools not available: {e}")
 import uvicorn
 from qdrant_client import QdrantClient
 from os import environ, getenv
@@ -177,6 +204,23 @@ def main():
     registry.register_tool("SolanaTokenFundamentals", TokenFundamentalAnalysis())
     registry.register_tool("SolanaTokenTechnicals", TokenTechnicalAnalysis())
     registry.register_tool("SolanaTokenInfo", TokenInfoTool())
+    
+    # LinkedIn Lead Generation Tool
+    try:
+        from src.tools.linkedin_lead_generator_tool import create_linkedin_lead_generator_tool
+        linkedin_tool = create_linkedin_lead_generator_tool()
+        registry.register_tool("LinkedInLeadGenerator", linkedin_tool)
+        print("🔗 LinkedIn Lead Generator tool registered successfully")
+    except Exception as e:
+        print(f"⚠️  LinkedIn Lead Generator tool registration warning: {e}")
+    
+    # LinkedIn Lead Generation Agent
+    try:
+        from src.agents.linkedin_lead_workflow import register_linkedin_lead_agent
+        linkedin_agent_id = register_linkedin_lead_agent(registry)
+        print(f"🤖 LinkedIn Lead Generation Agent registered with ID: {linkedin_agent_id}")
+    except Exception as e:
+        print(f"⚠️  LinkedIn Lead Generation Agent registration warning: {e}")
     # Trading tools
     try:
         registry.register_tool("IvishXAnalyze", IvishXAnalyzeTool())
@@ -206,6 +250,51 @@ def main():
             print("  ✅ Registered: Telegram message reading tools")
         except Exception as e:
             print(f"  ⚠️ Failed to register Telegram tools: {e}")
+    
+    # Register Hyperliquid tools if available
+    if 'HYPERLIQUID_TOOLS_AVAILABLE' in globals() and HYPERLIQUID_TOOLS_AVAILABLE:
+        print("💰 Registering Hyperliquid builder code tools...")
+        try:
+            for tool in HYPERLIQUID_TOOLS:
+                registry.register_tool(tool.name, tool)
+                print(f"  ✅ Registered: {tool.name}")
+            print(f"  🎯 Ready to earn builder fees on Hyperliquid trades!")
+        except Exception as e:
+            print(f"  ⚠️ Failed to register Hyperliquid tools: {e}")
+    
+    # Register Ship-to-Earn tools if available
+    if 'SHIP_TO_EARN_AVAILABLE' in globals() and SHIP_TO_EARN_AVAILABLE:
+        print("🚀 Registering Ship-to-Earn AI development team...")
+        try:
+            registry.register_tool("ProjectManagerAgent", ProjectManagerAgent())
+            registry.register_tool("SeniorDeveloperAgent", SeniorDeveloperAgent())
+            registry.register_tool("QAEngineerAgent", QAEngineerAgent())
+            registry.register_tool("DevOpsEngineerAgent", DevOpsEngineerAgent())
+            registry.register_tool("RevenueDistributionSystem", RevenueDistributionSystem())
+            print("  ✅ Ship-to-Earn agents registered successfully")
+            
+            # Register predefined workflows
+            register_ship_to_earn_workflows(registry)
+            print("  🎯 Ready to build software and earn revenue!")
+        except Exception as e:
+            print(f"  ⚠️ Failed to register Ship-to-Earn tools: {e}")
+    
+    # Register Scope AgentKit Idea tools
+    print("🚀 Registering Scope AgentKit Idea tools...")
+    try:
+        from src.tools.scope_agkit_idea_tool import scope_agkit_idea_tool
+        from src.agents.scope_agkit_idea_agent import register_scope_agkit_idea_agent
+        
+        # Register the tool
+        registry.register_tool("ScopeAgentKitIdea", scope_agkit_idea_tool)
+        print("  ✅ Scope AgentKit Idea tool registered")
+        
+        # Register the agent
+        agent_id = register_scope_agkit_idea_agent(registry)
+        print(f"  ✅ Scope AgentKit Idea agent registered with ID: {agent_id}")
+        
+    except Exception as e:
+        print(f"  ⚠️ Failed to register Scope AgentKit Idea tools: {e}")
 
     # Debug: Print all registered tools
     print("🔧 All registered tools:")

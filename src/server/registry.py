@@ -158,7 +158,7 @@ class Registry:
                 virtual_tools.append(virtual_tool)
         return virtual_tools
 
-    def generate_crew(self, workflow: Workflow):
+    def generate_crew(self, workflow: Workflow, inputs: dict = None):
         agents = {}
         for agent, config in workflow.agents.items():
             agents[agent] = Agent(
@@ -178,8 +178,21 @@ class Registry:
         tasks = {}
         for task in tsort(safe_graph):
             config = workflow.tasks[task]
+            # Inject input arguments into task description if inputs provided
+            task_description = config.description
+            if inputs:
+                for key, value in inputs.items():
+                    # Replace placeholders like <symbol>, <days> with actual values
+                    placeholder = f"<{key}>"
+                    if placeholder in task_description:
+                        task_description = task_description.replace(placeholder, str(value))
+                    # Also replace {key} format if used
+                    placeholder_curly = f"{{{key}}}"
+                    if placeholder_curly in task_description:
+                        task_description = task_description.replace(placeholder_curly, str(value))
+
             tasks[task] = Task(
-                description=config.description,
+                description=task_description,
                 expected_output=config.expected_output,
                 agent=agents[config.agent],
                 context=[tasks[dep] for dep in safe_graph[task]],
@@ -253,6 +266,7 @@ class Registry:
 
     def execute_tool(self, tool_id, kwargs: dict):
         tool_instance = self.tools[tool_id][0]
+        original_kwargs = kwargs
         # Normalize inputs that might arrive as a single JSON string (from LLM actions)
         try:
             if isinstance(kwargs, dict) and len(kwargs) == 1:
@@ -287,6 +301,8 @@ class Registry:
                 filtered = kwargs or {}
         except Exception:
             filtered = kwargs or {}
+
+        # No tool-specific argument overrides; tools must receive explicit args only
         return tool_instance.run(**filtered)
 
     def register_agent(self, workflow: Workflow):
@@ -372,7 +388,7 @@ class Registry:
                     f"invalid argument {argument}, valid: {workflow.arguments}"
                 )
 
-        return self.generate_crew(workflow).kickoff(inputs=arguments)
+        return self.generate_crew(workflow, inputs=arguments).kickoff(inputs=arguments)
 
     async def handle_agent_metadata(
         self, data: AgentMetadataRequest

@@ -306,8 +306,3 @@ class DexScreenerClient:
             'raw': main
         }
 
-
-
-
-
-
